@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Frame Buffer Object</title>
+  </head>
+
+  <body onload="main()">
+    <canvas id="webgl" width="400" height="400">
+      Please use a browser that supports "canvas"
+    </canvas>
+
+    <script src="./webgl-utils.js"></script>
+    <script src="./webgl-debug.js"></script>
+    <script src="./cuon-utils.js"></script>
+    <script src="./cuon-matrix.js"></script>
+    <script>
+      var m_VSHADER_SOURCE =
+        "attribute vec4 a_Position;\n" +
+        "void main() {\n" +
+        "  gl_Position = a_Position;\n" +
+        "}\n";
+
+      // 采样器，纹理坐标，纹理着色片元
+      var m_FSHADER_SOURCE =
+        "#ifdef GL_ES\n" +
+        "precision mediump float;\n" +
+        "#endif\n" +
+        "uniform sampler2D u_Sampler;\n" +
+        "void main() {\n" +
+        "  gl_FragColor = texture2D(u_Sampler, vec2(0.5,0.5));\n" +
+        "}\n";
+
+      var VSHADER_SOURCE =
+        "attribute vec4 a_Position;\n" +
+        "void main() {\n" +
+        "  gl_Position = a_Position;\n" +
+        "}\n";
+
+      // Fragment shader program
+      var FSHADER_SOURCE =
+        "#extension GL_EXT_draw_buffers : require\n" +
+        "void main() {\n" +
+        "  gl_FragData[0] = vec4(1.0, 0.0, 0.0, 1.0);\n" +
+        "  gl_FragData[1] = vec4(0.0, 1.0, 0.0, 1.0);\n" +
+        "}\n";
+      // Size of off screen
+      var OFFSCREEN_WIDTH = 256;
+      var OFFSCREEN_HEIGHT = 256;
+
+      function main() {
+        // Retrieve <canvas> element
+        var canvas = document.getElementById("webgl");
+        // Get the rendering context for WebGL
+        var gl = getWebGLContext(canvas);
+        var ext = gl.getExtension("WEBGL_draw_buffers");
+        // var ext = gl.getExtension('WEBGL_draw_buffers')
+        if (!gl) {
+          console.log("Failed to get the rendering context for WebGL");
+          return;
+        }
+        let initProgram = initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE);
+        var fbo = initFramebufferObject(gl, ext);
+
+        // Write the positions of vertices to a vertex shader
+        var n = initVertexBuffers(gl);
+        gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT); // Set a viewport for FBO
+        //设置背景色
+        gl.clearColor(0.2, 0.2, 0.4, 1.0); // Set clear color (the color is slightly changed)
+        //清空颜色和深度缓冲区
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear FBO
+
+        //清空
+        if (n < 0) {
+          console.log("Failed to set the positions of the vertices");
+          return;
+        }
+
+        // Specify the color for clearing <canvas>
+        gl.clearColor(0, 0, 0, 1);
+
+        // Clear <canvas>
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); // Change the drawing destination to FBO
+        // Draw the rectangle
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, n);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Change the drawing destination to color buffer
+        //重新设置屏幕渲染的视点
+        gl.viewport(0, 0, canvas.width, canvas.height); // Set the size of viewport back to that of <canvas>
+
+        let newProgram = initShaders(gl, m_VSHADER_SOURCE, m_FSHADER_SOURCE);
+        // Bind the texture object to the target
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, fbo.texture);
+        initVertexBuffers(gl);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, n);
+      }
+      function initFramebufferObject(gl, ext) {
+        var framebuffer, texture, texture2, depthBuffer;
+
+        //  1.创建FBO 帧缓冲区
+        framebuffer = gl.createFramebuffer();
+        {
+          texture = gl.createTexture(); // Create a texture object
+          gl.bindTexture(gl.TEXTURE_2D, texture); // Bind the object to target
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            OFFSCREEN_WIDTH,
+            OFFSCREEN_HEIGHT,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            null
+          );
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          framebuffer.texture = texture; // Store the texture object
+        }
+        // 3.创建texture2  texture = gl.createTexture()，并挂载到framebuffer.texture2属性上
+        {
+          texture2 = gl.createTexture(); // Create a texture object
+          gl.bindTexture(gl.TEXTURE_2D, texture2); // Bind the object to target
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            OFFSCREEN_WIDTH,
+            OFFSCREEN_HEIGHT,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            null
+          );
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          framebuffer.texture2 = texture2; // Store the texture object
+        }
+        // 4.将帧缓冲区绑定到程序上
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        //5.输出到对应的纹理中
+        gl.framebufferTexture2D(
+          gl.FRAMEBUFFER,
+          ext.COLOR_ATTACHMENT0_WEBGL,
+          gl.TEXTURE_2D,
+          texture,
+          0
+        );
+        gl.framebufferTexture2D(
+          gl.FRAMEBUFFER,
+          ext.COLOR_ATTACHMENT1_WEBGL,
+          gl.TEXTURE_2D,
+          texture2,
+          0
+        );
+        //6.调用drawbuffers
+        ext.drawBuffersWEBGL([
+          ext.COLOR_ATTACHMENT0_WEBGL, // gl_FragData[0]
+          ext.COLOR_ATTACHMENT1_WEBGL // gl_FragData[1]
+        ]);
+
+        // 7.创建渲染缓冲区 gl.createRenderbuffer()，输出深度值
+        {
+          depthBuffer = gl.createRenderbuffer(); // Create a renderbuffer object
+          gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer); // Bind the object to target
+          gl.renderbufferStorage(
+            gl.RENDERBUFFER,
+            gl.DEPTH_COMPONENT16,
+            OFFSCREEN_WIDTH,
+            OFFSCREEN_HEIGHT
+          );
+          // 渲染缓冲区对象关联到 帧缓冲区
+          gl.framebufferRenderbuffer(
+            gl.FRAMEBUFFER,
+            gl.DEPTH_ATTACHMENT,
+            gl.RENDERBUFFER,
+            depthBuffer
+          );
+        }
+        //8.解除帧缓冲区绑定  解除 渲染缓冲区绑定，解除纹理绑定
+        {
+          // 解除帧缓冲区绑定
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          //解除纹理
+          gl.bindTexture(gl.TEXTURE_2D, null);
+          //解除 渲染缓冲区
+          gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+        }
+
+        return framebuffer;
+      }
+
+      function initVertexBuffers(gl) {
+        var vertices = new Float32Array([
+          -0.5,
+          0.5,
+          -0.5,
+          -0.5,
+          0.5,
+          0.5,
+          0.5,
+          -0.5
+        ]);
+        var n = 4; // The number of vertices
+
+        // Create a buffer object
+        var vertexBuffer = gl.createBuffer();
+        if (!vertexBuffer) {
+          console.log("Failed to create the buffer object");
+          return -1;
+        }
+
+        // Bind the buffer object to target
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        // Write date into the buffer object
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+        var a_Position = gl.getAttribLocation(gl.program, "a_Position");
+        if (a_Position < 0) {
+          console.log("Failed to get the storage location of a_Position");
+          return -1;
+        }
+        // Assign the buffer object to a_Position variable
+        gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+
+        // Enable the assignment to a_Position variable
+        gl.enableVertexAttribArray(a_Position);
+
+        return n;
+      }
+    </script>
+  </body>
+</html>

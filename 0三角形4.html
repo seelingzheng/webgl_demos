@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      #canvas {
+        height: 600px;
+        width: 800px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" height="600" width="800"></canvas>
+    <script>
+      let canvas = document.getElementById("canvas");
+      let gl = canvas.getContext("webgl");
+      console.log(gl);
+      gl.viewport(0, 0, 800, 600);
+      gl.clearColor(1, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      let positionIndex = 0;
+      let colorIndex = 1;
+      let vsStr = `
+            precision lowp float;
+            attribute vec3 a_position;
+            attribute vec3 a_incolor;
+            varying  vec3 outcolor;
+            void main(void){
+                outcolor = vec3(a_incolor);
+                gl_Position = vec4(a_position,1.);
+            }
+        `;
+      let fsStr = `
+            precision lowp float;
+            varying vec3 outcolor;
+            void main(void){
+                gl_FragColor = vec4(outcolor,1.);
+            }
+        `;
+      let vs = gl.createShader(gl.VERTEX_SHADER);
+      let fs = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(vs, vsStr);
+      gl.shaderSource(fs, fsStr);
+      gl.compileShader(vs);
+      gl.compileShader(fs);
+      let program = gl.createProgram();
+      console.log(fs);
+      gl.attachShader(program, vs);
+      gl.attachShader(program, fs);
+      gl.bindAttribLocation(program, positionIndex, "a_position");
+      gl.bindAttribLocation(program, colorIndex, "a_incolor");
+      gl.linkProgram(program);
+
+      gl.useProgram(program);
+
+      let jsArrayData = [
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ];
+      let indexData = [0, 1, 2];
+
+      let triangleBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, triangleBuffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(jsArrayData),
+        gl.STATIC_DRAW
+      );
+
+      gl.enableVertexAttribArray(positionIndex);
+      gl.enableVertexAttribArray(colorIndex); // 注释这一行，能显示黑色三角形
+      gl.vertexAttribPointer(positionIndex, 3, gl.FLOAT, false, 4 * 6, 0);
+      gl.vertexAttribPointer(colorIndex, 3, gl.FLOAT, false, 4 * 6, 3 * 4);
+      gl.vertexAttribPointer(colorIndex, 3, gl.FlOAT, false, 4 * 6, 3 * 4);
+
+      let indexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(indexData),
+        gl.STATIC_DRAW
+      );
+
+      gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, 0);
+    </script>
+  </body>
+</html>

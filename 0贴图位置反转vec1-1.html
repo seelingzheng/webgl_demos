@@ -1,0 +1,144 @@
+<canvas id="canvas"></canvas>
+<!-- vertex shader -->
+<script  id="vertex-shader-2d" type="x-shader/x-vertex">
+attribute vec2 a_position;
+attribute vec2 a_texCoord;
+
+uniform vec2 u_resolution;
+
+varying vec2 v_texCoord;
+
+void main() {
+   vec2 zeroToOne = a_position / u_resolution;
+   vec2 zeroToTwo = zeroToOne * 2.0;
+   vec2 clipSpace = zeroToTwo - 1.0;
+   gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+   v_texCoord = a_texCoord;
+}
+</script>
+<style>
+  @import url("https://webglfundamentals.org/webgl/resources/webgl-tutorials.css");
+  body {
+    margin: 0;
+  }
+  canvas {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+  }
+  
+  </style>
+<script  id="fragment-shader-2d" type="x-shader/x-fragment">
+precision mediump float;
+uniform sampler2D u_image;
+varying vec2 v_texCoord;
+void main() {
+   gl_FragColor = texture2D(u_image, v_texCoord);
+}
+</script><!--
+for most samples webgl-utils only provides shader compiling/linking and
+canvas resizing because why clutter the examples with code that's the same in every sample.
+See https://webglfundamentals.org/webgl/lessons/webgl-boilerplate.html
+and https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
+for webgl-utils, m3, m4, and webgl-lessons-ui.
+-->
+<script src="https://webglfundamentals.org/webgl/resources/webgl-utils.js"></script>
+<!-- end snippet -->
+<!-- language: lang-js -->
+<script>
+// WebGL - 2D Image
+// from https://webglfundamentals.org/webgl/webgl-2d-image.html
+
+
+"use strict";
+
+function main() {
+  var image = new Image();
+  requestCORSIfNotSameOrigin(image, "https://webglfundamentals.org/webgl/resources/leaves.jpg")
+  image.src = "https://webglfundamentals.org/webgl/resources/leaves.jpg";
+  image.onload = function() {
+    render(image);
+  };
+}
+
+function render(image) {
+  // Get A WebGL context
+  /** @type {HTMLCanvasElement} */
+  var canvas = document.querySelector("#canvas");
+  var gl = canvas.getContext("webgl");
+  var program = webglUtils.createProgramFromScripts(gl, ["vertex-shader-2d", "fragment-shader-2d"]);
+  var positionLocation = gl.getAttribLocation(program, "a_position");
+  var texcoordLocation = gl.getAttribLocation(program, "a_texCoord");
+  var positionBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  setRectangle(gl, 0, 0, image.width, image.height); //bindata 不引用以上
+
+  var texcoordBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      0.0,  0.0,
+      1.0,  0.0,
+      0.0,  1.0,
+      0.0,  1.0,
+      1.0,  0.0,
+      1.0,  1.0,
+  ]), gl.STATIC_DRAW);
+
+  // Create a texture.
+  var texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  var resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+  webglUtils.resizeCanvasToDisplaySize(gl.canvas);
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(program);
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.enableVertexAttribArray(positionLocation);
+  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
+  gl.enableVertexAttribArray(texcoordLocation);
+
+  gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
+  gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
+
+function setRectangle(gl, x, y, width, height) {
+  var x1 = x;
+  var x2 = x + width;
+  var y1 = y;
+  var y2 = y + height;
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+     x1, y1,
+     x2, y1,
+     x1, y2,
+     x1, y2,
+     x2, y1,
+     x2, y2,
+  ]), gl.STATIC_DRAW);
+}
+
+main();
+
+
+// This is needed if the images are not on the same domain
+// NOTE: The server providing the images must give CORS permissions
+// in order to be able to use the image with WebGL. Most sites
+// do NOT give permission.
+// See: https://webglfundamentals.org/webgl/lessons/webgl-cors-permission.html
+function requestCORSIfNotSameOrigin(img, url) {
+  if ((new URL(url, window.location.href)).origin !== window.location.origin) {
+    img.crossOrigin = "";
+  }
+}
+
+</script>
+<!-- language: lang-css -->
+
+<!-- language: lang-html -->

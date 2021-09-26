@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script type="text/javascript" src="script.js"></script>
+  </head>
+  <body style="margin: 0px;" onload="main()">
+    <canvas id="your_canvas" style="position: absolute;"></canvas>
+  </body>
+  <script>
+    var main = function () {
+      var CANVAS = document.getElementById("your_canvas");
+      CANVAS.width = window.innerWidth;
+      CANVAS.height = window.innerHeight;
+
+      var GL = CANVAS.getContext("experimental-webgl", { antialias: true });
+      //getWebGLContext
+      var shader_vertex_source =
+        "\n\
+        attribute vec3 a_position; //the position of the point\n\
+        attribute vec3 incolor;  //the color of the point\n\
+        varying vec3 vColor;\n\
+        void main(void) { //pre-built function\n\
+          gl_Position = vec4(a_position, 1.); //0. is the z, and 1 is w\n\
+          vColor=incolor;\n\
+        }";
+      var shader_fragment_source =
+        "\n\
+        precision mediump float;\n\
+        varying vec3 vColor;\n\
+        void main(void) {\n\
+          gl_FragColor = vec4(vColor, 1.);\n\
+        }";
+
+      var get_shader = function (source, type, typeString) {
+        var shader = GL.createShader(type);
+        GL.shaderSource(shader, source);
+        GL.compileShader(shader);
+        if (!GL.getShaderParameter(shader, GL.COMPILE_STATUS)) {
+          alert(
+            "ERROR IN " +
+              typeString +
+              " SHADER : " +
+              GL.getShaderInfoLog(shader)
+          );
+          return false;
+        }
+        return shader;
+      };
+
+      var SHADER_PROGRAM = GL.createProgram();
+      GL.attachShader(
+        SHADER_PROGRAM,
+        get_shader(shader_vertex_source, GL.VERTEX_SHADER, "VERTEX")
+      );
+      GL.attachShader(
+        SHADER_PROGRAM,
+        get_shader(shader_fragment_source, GL.FRAGMENT_SHADER, "FRAGMENT")
+      );
+      GL.linkProgram(SHADER_PROGRAM);
+      GL.useProgram(SHADER_PROGRAM);
+
+      var triangle_vertex = [
+        -1,
+        -1,
+        0,
+        0,
+        0,
+        1, //first corner: -> bottom left of the viewport
+        1,
+        -1,
+        0,
+        1,
+        1,
+        0, //bottom right of the viewport
+        1,
+        1,
+        0,
+        1,
+        0,
+        0 //top right of the viewport
+      ];
+      var TRIANGLE_VERTEX = GL.createBuffer();
+      GL.bindBuffer(GL.ARRAY_BUFFER, TRIANGLE_VERTEX);
+      GL.bufferData(
+        GL.ARRAY_BUFFER,
+        new Float32Array(triangle_vertex),
+        GL.STATIC_DRAW
+      );
+      var _color = GL.getAttribLocation(SHADER_PROGRAM, "color");
+      var _position = GL.getAttribLocation(SHADER_PROGRAM, "a_position");
+      GL.enableVertexAttribArray(_color);
+      GL.enableVertexAttribArray(_position);
+      GL.vertexAttribPointer(_position, 3, GL.FLOAT, false, 4 * (3 + 3), 0);
+      GL.vertexAttribPointer(_color, 3, GL.FLOAT, false, 4 * (3 + 3), 3 * 4);
+
+      //FACES :
+      var triangle_faces = [0, 1, 2];
+      var TRIANGLE_FACES = GL.createBuffer();
+      GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, TRIANGLE_FACES);
+      GL.bufferData(
+        GL.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(triangle_faces),
+        GL.STATIC_DRAW
+      );
+
+      GL.clearColor(0.0, 0.0, 0.0, 0.0);
+      GL.viewport(0.0, 0.0, CANVAS.width, CANVAS.height);
+      var animate = function () {
+        GL.clear(GL.COLOR_BUFFER_BIT);
+        //GL.drawElements(GL.TRIANGLES, 3, GL.UNSIGNED_SHORT, 0);
+        GL.drawArrays(GL.TRIANGLES, 0, 3);
+        // GL.flush();
+        window.requestAnimationFrame(animate);
+      };
+
+      animate();
+    };
+  </script>
+</html>
